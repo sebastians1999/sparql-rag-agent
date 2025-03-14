@@ -8,8 +8,9 @@ from langchain_core.messages import AIMessage
 import json
 from pydantic import ValidationError
 from scr.agent.utils.config import Configuration
+from langchain_core.runnables import RunnableConfig
 
-async def question_understanding(state: State, config: RunnerConfig) -> Dict[str, List[AIMessage]]:
+async def question_understanding(state: State, config: RunnableConfig) -> Dict[str, List[AIMessage]]:
     """Extract structured information from the user question.
     
     Args:

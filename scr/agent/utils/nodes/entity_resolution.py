@@ -6,6 +6,7 @@ from langchain_core.documents import Document
 from typing import List, Dict, Any
 from langchain_qdrant import QdrantVectorStore, RetrievalMode
 from scr.agent.utils.config import Configuration
+from langchain_core.runnables import RunnableConfig
 
 # Test documents for development and testing
 TEST_DOCUMENTS = [

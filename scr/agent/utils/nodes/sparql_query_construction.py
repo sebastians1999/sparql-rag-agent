@@ -6,9 +6,11 @@ from langchain_core.prompts import ChatPromptTemplate
 from scr.agent.utils.prompts.prompts import QUERY_GENERATION_PROMPT
 from typing import List, Dict, Any
 from scr.agent.utils.config import Configuration
+from langchain_core.runnables import RunnableConfig
 
 
-async def query_generator(state: State, config: RunnerConfig) -> Dict[str, Any]:
+
+async def query_generator(state: State, config: RunnableConfig) -> Dict[str, Any]:
     """Generate a SPARQL query based on the structured question and retrieved documents.
     
     Args:
