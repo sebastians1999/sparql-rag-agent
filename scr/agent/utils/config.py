@@ -1,13 +1,19 @@
-from dataclasses import dataclass, field
+"""Define the configurable parameters for the SPARQL RAG agent."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field, fields
 from typing import Optional, Dict, Any, List
+
+from langchain_core.runnables import RunnableConfig
 
 
 @dataclass
 class LLMConfig:
     """Configuration for the Language Model."""
     
-    model_name: str = "gpt-4"
-    temperature: float = 0.7
+    model_name: str = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free"
+    temperature: float = 1.0
     max_tokens: Optional[int] = None
     top_p: float = 1.0
     frequency_penalty: float = 0.0
@@ -41,8 +47,8 @@ class LoggingConfig:
     enable_file_logging: bool = False
 
 
-@dataclass
-class RunnerConfig:
+@dataclass(kw_only=True)
+class Configuration:
     """Main configuration for the agent runner."""
     
     llm_config: LLMConfig = field(default_factory=LLMConfig)
@@ -56,14 +62,42 @@ class RunnerConfig:
     cache_results: bool = True
     cache_dir: str = ".cache"
     
+    # Test mode flag for retrieval of Qdrant
+    test_mode: bool = False
+    
+    
     # Custom parameters for specific nodes
     node_params: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     
     # List of enabled nodes/components
     enabled_components: List[str] = field(default_factory=list)
     
-    def get_node_param(self, node_name: str, param_name: str, default: Any = None) -> Any:
-        """Get a parameter for a specific node."""
-        if node_name in self.node_params and param_name in self.node_params[node_name]:
-            return self.node_params[node_name][param_name]
-        return default 
+    
+    @classmethod
+    def from_runnable_config(
+        cls, config: Optional[RunnableConfig] = None
+    ) -> Configuration:
+        """Create a RunnerConfig instance from a RunnableConfig object."""
+        configurable = (config.get("configurable") or {}) if config else {}
+        
+        # Extract top-level fields
+        _fields = {f.name for f in fields(cls) if f.init}
+        top_level_params = {k: v for k, v in configurable.items() if k in _fields and k not in ["llm_config", "rag_config", "logging_config"]}
+        
+        # Extract nested config fields
+        llm_config_params = configurable.get("llm_config", {})
+        rag_config_params = configurable.get("rag_config", {})
+        logging_config_params = configurable.get("logging_config", {})
+        
+        # Create nested configs
+        llm_config = LLMConfig(**llm_config_params) if llm_config_params else LLMConfig()
+        rag_config = RAGConfig(**rag_config_params) if rag_config_params else RAGConfig()
+        logging_config = LoggingConfig(**logging_config_params) if logging_config_params else LoggingConfig()
+        
+        # Create and return the RunnerConfig
+        return cls(
+            llm_config=llm_config,
+            rag_config=rag_config,
+            logging_config=logging_config,
+            **top_level_params
+        ) 

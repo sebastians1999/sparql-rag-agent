@@ -1,0 +1,7 @@
+{
+    "dependencies": ["."],
+    "graphs": {
+        "agent": "./scr/agent/utils/graph.py:create_graph"
+    },
+    "env": ".env"
+} 
