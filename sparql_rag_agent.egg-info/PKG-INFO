@@ -17,3 +17,6 @@ Requires-Dist: certifi>=2025.1.31
 Requires-Dist: fastembed>=0.2.6
 Requires-Dist: qdrant-client>=1.13.2
 Requires-Dist: langchain-qdrant>=0.2.0
+Requires-Dist: pydantic>=2.10.6
+Requires-Dist: typing-extensions>=4.12.2
+Requires-Dist: langchain-together>=0.3.0
