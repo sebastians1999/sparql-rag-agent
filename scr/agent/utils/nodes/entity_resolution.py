@@ -7,6 +7,7 @@ from typing import List, Dict, Any
 from langchain_qdrant import QdrantVectorStore, RetrievalMode
 from scr.agent.utils.config import Configuration
 from langchain_core.runnables import RunnableConfig
+from langchain_core.messages import AIMessage
 
 # Test documents for development and testing
 TEST_DOCUMENTS = [
@@ -67,7 +68,7 @@ TEST_DOCUMENTS = [
     )
 ]
 
-async def retrieve_documents(state: State, config: RunnableConfig) -> Dict[str, Any]:
+async def retrieve_documents(state: State, config: RunnableConfig) -> Dict[str, List[AIMessage]]:
     # Test mode - return predefined documents
 
     configuration = Configuration.from_runnable_config(config)

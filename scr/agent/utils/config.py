@@ -63,7 +63,7 @@ class Configuration:
     cache_dir: str = ".cache"
     
     # Test mode flag for retrieval of Qdrant
-    test_mode: bool = False
+    test_mode: bool = True
     
     
     # Custom parameters for specific nodes

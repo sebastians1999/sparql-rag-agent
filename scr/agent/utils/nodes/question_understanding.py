@@ -42,7 +42,7 @@ async def question_understanding(state: State, config: RunnableConfig) -> Dict[s
 
         chain = prompt_template | llm
 
-        response = chain.invoke(state.messages)
+        response = chain.invoke({"messages": state.messages})
 
         # Ensure the response is a valid JSON
         try:

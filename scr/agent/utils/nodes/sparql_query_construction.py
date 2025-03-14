@@ -9,7 +9,7 @@ from langchain_core.runnables import RunnableConfig
 
 
 
-async def query_generator(state: State, config: RunnableConfig) -> Dict[str, Any]:
+async def query_generator(state: State, config: RunnableConfig) -> Dict[str, List[AIMessage]]:
     """Generate a SPARQL query based on the structured question and retrieved documents.
     
     Args:

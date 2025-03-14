@@ -20,7 +20,7 @@ def print_test_results(final_state: State):
     """Print the results of a test run."""
     print("\n=== Test Results ===")
     print("\n1. Question Understanding:")
-    print(f"Intent: {final_state.structured_question.intent}")
+    print(f"Intent: {final_state.structured_question}")
     print("\nExtracted Classes:")
     for cls in final_state.structured_question.extracted_classes:
         print(f"- {cls}")
@@ -55,7 +55,7 @@ async def test_agent():
             
             try:
                 final_state = await run_single_test(question)
-                print_test_results(final_state)
+                #print_test_results(final_state)
             except Exception as e:
                 print(f"\nError in scenario '{scenario}': {str(e)}")
                 continue
