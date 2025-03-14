@@ -1,5 +1,4 @@
 from scr.agent.utils.state.state import State, StepOutput
-from scr.agent.utils.config import RunnerConfig
 from langchain_together import Together
 from langchain_core.messages import AIMessage
 from langchain_core.prompts import ChatPromptTemplate
