@@ -1,13 +1,14 @@
-from scr.agent.utils.state.state import State, StructuredQuestion, StepOutput
+from scr.agent.state.state import State, StructuredQuestion, StepOutput
 from langchain_together import Together
 from langchain_core.prompts import ChatPromptTemplate
-from scr.agent.utils.prompts.prompts import EXTRACTION_PROMPT
+from scr.agent.prompts.prompts import EXTRACTION_PROMPT
 from typing import Dict, Any, List
 from langchain_core.messages import AIMessage
 import json
 from pydantic import ValidationError
 from scr.agent.utils.config import Configuration
 from langchain_core.runnables import RunnableConfig
+from scr.agent.utils.llm_utils import get_llm
 
 async def question_understanding(state: State, config: RunnableConfig) -> Dict[str, List[AIMessage]]:
     """Extract structured information from the user question.
@@ -25,13 +26,12 @@ async def question_understanding(state: State, config: RunnableConfig) -> Dict[s
     """
 
 
-    configuration = Configuration.from_runnable_config(config)
-
     if not state.messages:
         raise ValueError("No messages found in state")
 
     try:
-        llm = Together(model=configuration.llm_config.model_name, temperature=configuration.llm_config.temperature)
+        configuration = Configuration.from_runnable_config(config)
+        llm = get_llm(configuration)
 
         prompt_template = ChatPromptTemplate.from_messages(
             [
@@ -40,11 +40,15 @@ async def question_understanding(state: State, config: RunnableConfig) -> Dict[s
             ]
         )
 
-        chain = prompt_template | llm
+        message_value = await prompt_template.ainvoke(
+            {
+                "messages": state.messages,
+            },
+        )
 
-        response = chain.invoke({"messages": state.messages})
+        response = await llm.invoke(message_value)
 
-        # Ensure the response is a valid JSON
+        #ensure the response is a valid JSON
         try:
             structured_question = StructuredQuestion.model_validate_json(response.content)
         except json.JSONDecodeError as e:

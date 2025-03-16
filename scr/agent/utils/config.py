@@ -12,15 +12,17 @@ from langchain_core.runnables import RunnableConfig
 class LLMConfig:
     """Configuration for the Language Model."""
     
+    provider: str = "together" 
     model_name: str = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free"
     temperature: float = 1.0
-    max_tokens: Optional[int] = None
+    max_tokens: Optional[int] = 300
     top_p: float = 1.0
     frequency_penalty: float = 0.0
     presence_penalty: float = 0.0
     timeout: int = 60  # seconds
     api_key: Optional[str] = None
     api_base: Optional[str] = None
+
 
 
 @dataclass

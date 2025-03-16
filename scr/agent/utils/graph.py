@@ -3,10 +3,10 @@ from langgraph.graph import Graph, StateGraph
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
 
-from scr.agent.utils.nodes.question_understanding import question_understanding
-from scr.agent.utils.nodes.entity_resolution import retrieve_documents
-from scr.agent.utils.nodes.sparql_query_construction import query_generator
-from scr.agent.utils.state.state import State
+from scr.agent.nodes.question_understanding import question_understanding
+from scr.agent.nodes.entity_resolution import retrieve_documents
+from scr.agent.nodes.sparql_query_construction import query_generator
+from scr.agent.state.state import State
 from scr.agent.utils.config import Configuration
 
 
