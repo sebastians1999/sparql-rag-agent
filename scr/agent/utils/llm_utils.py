@@ -26,6 +26,13 @@ try:
 except ImportError:
     ANTHROPIC_AVAILABLE = False
 
+# Import Groq model
+try:
+    from langchain_groq import ChatGroq
+    GROQ_AVAILABLE = True
+except ImportError:
+    GROQ_AVAILABLE = False
+
 from scr.agent.utils.config import Configuration, LLMConfig
 
 
@@ -78,6 +85,28 @@ def get_llm(config: Optional[Configuration] = None) -> BaseChatModel:
         )
     
     elif llm_config.provider.lower() == "anthropic":
+        if not ANTHROPIC_AVAILABLE:
+            raise ImportError(
+                "The 'langchain_anthropic' package is not installed. "
+                "Please install it with 'pip install langchain_anthropic'."
+            )
+        return ChatAnthropic(
+            model=llm_config.model_name,
+            api_key=llm_config.api_key,
+            **common_params
+        )
+    elif llm_config.provider.lower() == "groq":
+        if not GROQ_AVAILABLE:
+            raise ImportError(
+                "The 'langchain_groq' package is not installed. "
+                "Please install it with 'pip install langchain_groq'."
+            )
+        return ChatGroq(
+            model=llm_config.model_name,
+            api_key=llm_config.api_key,
+            **common_params
+        )
+    elif llm_config.provider.lower() == "":
         if not ANTHROPIC_AVAILABLE:
             raise ImportError(
                 "The 'langchain_anthropic' package is not installed. "
