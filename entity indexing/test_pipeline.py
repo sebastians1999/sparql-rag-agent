@@ -1,4 +1,4 @@
-from entity_indexing_pipeline_v2 import EmbeddingPipeline
+from entity_indexing_pipeline_v3 import EmbeddingPipeline
 import ray
 
 def test_pipeline():
@@ -51,8 +51,8 @@ def test_pipeline():
 if __name__ == "__main__":
 
 
-    #ray.init(ignore_reinit_error=True)
+    ray.init(ignore_reinit_error=True)
 
     test_pipeline()
 
-    #ray.shutdown()
+    ray.shutdown()

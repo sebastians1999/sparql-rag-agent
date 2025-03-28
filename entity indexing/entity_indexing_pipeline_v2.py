@@ -2,7 +2,9 @@ from typing import List, Dict, Optional
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from qdrant_client.http.models import SearchRequest, NamedVector, NamedSparseVector, SparseIndexParams, SparseVector
-from fastembed import SparseEmbedding, TextEmbedding
+from langchain_qdrant.fastembed_sparse import FastEmbedSparse
+from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
+import gc
 import numpy as np
 from fastembed.sparse import SparseTextEmbedding
 import time
@@ -27,26 +29,26 @@ class RetrievalMode:
     SPARSE = "sparse"
 
 
-class FastEmbedDense:
+class FastEmbedDense_:
     def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5"):
-        self.dense_model = TextEmbedding(
+        self.dense_model = FastEmbedEmbeddings(
             model_name=model_name,
-            batch_size=32
+            parallel=4
         )
     
     def encode(self, texts: List[str]):
-        return list(self.dense_model.embed(texts))
+        return list(self.dense_model.embed_documents(texts))
 
 
-class FastEmbedSparse:
+class FastEmbedSparse_:
     def __init__(self, model_name: str = "prithivida/Splade_PP_en_v1"):
-        self.sparse_model = SparseTextEmbedding(
+        self.sparse_model = FastEmbedSparse(
             model_name=model_name,
-            batch_size=32
+            parallel=4
         )
     
     def encode(self, texts: List[str]):
-        return list(self.sparse_model.embed(texts))
+        return list(self.sparse_model.embed_documents(texts))
 
 
 class EmbeddingPipeline:
@@ -74,8 +76,8 @@ class EmbeddingPipeline:
         
         # Initialize embedders
         print("Initializing FastEmbed encoders")
-        self.dense_encoder = FastEmbedDense(model_name=dense_model_name)
-        self.sparse_encoder = FastEmbedSparse(model_name=sparse_model_name)
+        self.dense_encoder = FastEmbedDense_(model_name=dense_model_name)
+        self.sparse_encoder = FastEmbedSparse_(model_name=sparse_model_name)
         
         # Create collection if it doesn't exist
         self._initialize_collection()
@@ -116,7 +118,7 @@ class EmbeddingPipeline:
             print(f"Error in collection initialization: {str(e)}")
             raise
 
-    def add_documents(self, documents: List[Dict[str, str]], batch_size: int = 64):
+    def add_documents(self, documents: List[Dict[str, str]], batch_size: int = 256):
         """Add documents to the collection in batches"""
         total_docs = len(documents)
         print(f"Adding {total_docs} documents in batches of {batch_size}")
@@ -127,15 +129,21 @@ class EmbeddingPipeline:
             try:
                 # Generate embeddings for the batch
                 texts = [doc['label'] for doc in batch]
-                start_time = time.time()
-                
-                dense_embeddings = self.dense_encoder.encode(texts)
 
+
+                start_time = time.time()
+                dense_embeddings = self.dense_encoder.encode(texts)
                 end_time = time.time()  
-                print("Time taken to generate embeddings without Ray Distributed Computing:", end_time - start_time, "seconds")
+                print("Time taken to generate dense embeddings without Ray Distributed Computing:", end_time - start_time, "seconds")
                 
-                #contains list of sparse embeddings objects. Each object has indices and values
+
+                start_time = time.time()
                 sparse_embeddings = self.sparse_encoder.encode(texts)
+                end_time = time.time() 
+                print("Time taken to generate sparse embeddings without Ray Distributed Computing:", end_time - start_time, "seconds")
+
+
+                gc.collect()
                 
                 points = []
                 for idx, (doc, dense_vector, sparse_vector) in enumerate(zip(batch, dense_embeddings, sparse_embeddings)):
