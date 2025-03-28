@@ -9,6 +9,9 @@ import math
 import os
 import time
 import ray
+import gc
+import json
+from upload_tracker import UploadTracker
 from qdrant_client.models import (
     Distance,
     NamedSparseVector,
@@ -22,6 +25,7 @@ from qdrant_client.models import (
     ScoredPoint,
 )
 
+
 class RetrievalMode:
     HYBRID = "hybrid"
     DENSE = "dense"
@@ -29,29 +33,22 @@ class RetrievalMode:
 
 
 @ray.remote
-class EmbeddingWorkerDense: 
-    def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5"):
+class EmbeddingWorker: 
+    def __init__(self, model_name_dense: str = None, model_name_sparse: str = None):
 
-        self.dense_model = TextEmbedding(model_name=model_name, cache_dir="./embeddings_model_cache")
+        self.dense_model = TextEmbedding(model_name=model_name_dense, cache_dir="./embeddings_model_cache")
+        self.sparse_model = SparseTextEmbedding(model_name=model_name_sparse, cache_dir="./embeddings_model_cache")
         
-    def encode(self, texts: List[str]):
+    def encode_dense(self, texts: List[str]):
         return list(self.dense_model.embed(texts))
+    
+    def encode_sparse(self, texts: List[str]):
+        return list(self.sparse_model.embed(texts))
     
     def cleanup(self):
         del self.dense_model
-        import gc
+        del self.sparse_model
         gc.collect()
-
-
-class FastEmbedSparse:
-    def __init__(self, model_name: str = "prithivida/Splade_PP_en_v1"):
-        self.sparse_model = SparseTextEmbedding(
-            model_name=model_name,
-            batch_size=32
-        )
-    
-    def encode(self, texts: List[str]):
-        return list(self.sparse_model.embed(texts))
 
 
 class EmbeddingPipeline:
@@ -63,14 +60,16 @@ class EmbeddingPipeline:
         host: str = "localhost",
         grpc_port: int = 6334,
         retrieval_mode: str = RetrievalMode.HYBRID,
-        num_workers: int = 4
-        
+        num_workers: int = 3,
+        log_dir: str = "./upload_logs"
     ):
         # Create a pool of workers once
+        print("Creating embedding workers...")
         self.num_workers = num_workers
-        self.worker_pool = [EmbeddingWorkerDense.remote(model_name=dense_model_name) for _ in range(self.num_workers)]
+        self.worker_pool = [EmbeddingWorker.remote(model_name_dense=dense_model_name, model_name_sparse=sparse_model_name) for _ in range(self.num_workers)]
         
         # Initialize Qdrant client
+        print("Initializing Qdrant client...")
         self.client = QdrantClient(
             host=host,
             grpc_port=grpc_port,
@@ -80,13 +79,12 @@ class EmbeddingPipeline:
 
         self.client.set_model(dense_model_name)
         self.client.set_sparse_model(sparse_model_name)
-        
+    
         self.collection_name = collection_name
         self.retrieval_mode = retrieval_mode
         
-        # Initialize embedders
-        print("Initializing FastEmbed encoders")
-        self.sparse_encoder = FastEmbedSparse(model_name=sparse_model_name)
+        # Initialize upload tracker
+        self.upload_tracker = UploadTracker(collection_name, log_dir)
         
         # Create collection if it doesn't exist
         self._initialize_collection()
@@ -110,6 +108,10 @@ class EmbeddingPipeline:
                         distance=models.Distance.COSINE
                     )
                 },
+                hnsw_config=models.HnswConfigDiff(
+                    on_disk=True
+                    #indexing_threshold=0
+                ),  
                 sparse_vectors_config={
                     "sparse": models.SparseVectorParams(
                         index=SparseIndexParams(
@@ -124,8 +126,16 @@ class EmbeddingPipeline:
             print(f"Error in collection initialization: {str(e)}")
             raise
 
-    def add_documents(self, documents: List[Dict[str, str]], batch_size: int = 64):
+    def add_documents(self, documents: List[Dict[str, str]], batch_size: int = 300, skip_existing: bool = True):
         """Add documents to the collection in batches"""
+        
+        # Filter out already uploaded documents if skip_existing is True
+        if skip_existing:
+            documents = self.upload_tracker.filter_new_entities(documents)
+            if not documents:
+                print("All documents have already been uploaded. Skipping.")
+                return
+        
         total_docs = len(documents)
         print(f"Adding {total_docs} documents in batches of {batch_size}")
         
@@ -135,15 +145,23 @@ class EmbeddingPipeline:
             try:
                 # Generate embeddings for the batch
                 texts = [doc['label'] for doc in batch]
-                print(texts)
+                #print(texts)
                 dense_embeddings = self.chunk_encode_dense(texts)
+                
                 #contains list of sparse embeddings objects. Each object has indices and values
-                sparse_embeddings = self.sparse_encoder.encode(texts)
+                sparse_embeddings = self.chunk_encode_sparse(texts)
+                
+                gc.collect()
                 
                 points = []
+                batch_ids = []
+                print("Creating points...")
                 for idx, (doc, dense_vector, sparse_vector) in enumerate(zip(batch, dense_embeddings, sparse_embeddings)):
                     # Convert sparse embedding to the format expected by Qdrant
                     sparse_vector = SparseVector(indices=sparse_vector.indices.tolist(), values=sparse_vector.values.tolist())
+                    batch_ids.append(doc['uri'])
+
+
                     point = PointStruct(
                         id=i + idx,
                         vector={
@@ -153,32 +171,109 @@ class EmbeddingPipeline:
                         payload={
                             "uri": doc['uri'],
                             "label": doc['label'],
-                            "type": doc.get('type', 'unknown'),
+                            "type": doc['entity_type'],
                             "description": doc.get('description', '')
                         }
                     )
                     points.append(point)
-                
+
+                print("Upserting points...")
                 self.client.upsert(
                     collection_name=self.collection_name,
                     points=points
                 )
-                print(f"✓ Batch {i//batch_size + 1}/{(total_docs + batch_size - 1)//batch_size}")
+                
+                # Mark batch as uploaded
+                self.upload_tracker.mark_as_uploaded(batch_ids)
+                
+                print(f"✓ Batch {i//batch_size + 1}/{(total_docs + batch_size - 1)//batch_size} - Total uploaded: {self.upload_tracker.get_uploaded_count()}")
                 
             except Exception as e:
                 print(f"Error processing batch {i//batch_size + 1}: {str(e)}")
                 continue
         
+        # Enable indexing after all data is loaded
+        # self.client.update_collection(
+        #     collection_name=self.collection_name,
+        #     optimizer_config=models.OptimizersConfigDiff(
+        #         indexing_threshold=20000
+        #     )
+        # )
         # Cleanup resources
         cleanup_tasks = [worker.cleanup.remote() for worker in self.worker_pool]
         ray.get(cleanup_tasks)
         ray.shutdown()
 
+    def chunk_encode_dense(self, texts: List[str]):
+        # Use existing workers instead of creating new ones
+        chunk_size = len(texts) // self.num_workers
+        text_chunks = [texts[i:i+chunk_size] for i in range(0, len(texts), chunk_size)]
+        print("Chunk size:", chunk_size)
+
+        chunk_object_ref = [ray.put(text_chunk) for text_chunk in text_chunks]
+        
+        # Reuse worker pool which got initialized in __init__ of EmbeddingPipeline
+        start_time = time.time()
+        embedding_tasks_ref = [worker.encode_dense.remote(chunk_ref) for worker, chunk_ref in zip(self.worker_pool, chunk_object_ref)]
+        embeddings = ray.get(embedding_tasks_ref)
+        end_time = time.time()
+
+        for refs in chunk_object_ref:
+            del refs
+        del chunk_object_ref
+        gc.collect()
+
+        for ref in embedding_tasks_ref:
+            del ref
+        del embedding_tasks_ref
+        gc.collect()
+
+        # Flatten the embeddings list
+        embeddings = [embedding for sublist in embeddings for embedding in sublist]
+
+        print("Time taken to generate dense embeddings with Ray Distributed Computing:", end_time - start_time, "seconds")
+
+        #print("Generated embeddings:", embeddings)
+        return embeddings
+
+
+
+    def chunk_encode_sparse(self, texts: List[str]):
+        # Use existing workers instead of creating new ones
+        chunk_size = len(texts) // self.num_workers
+        text_chunks = [texts[i:i+chunk_size] for i in range(0, len(texts), chunk_size)]
+
+        chunk_object_ref = [ray.put(text_chunk) for text_chunk in text_chunks]
+
+        # Reuse worker pool which got initialized in __init__ of EmbeddingPipeline
+        start_time = time.time()
+        embedding_tasks_ref = [worker.encode_sparse.remote(chunk_ref) for worker, chunk_ref in zip(self.worker_pool, chunk_object_ref)]
+        embeddings = ray.get(embedding_tasks_ref)
+        end_time = time.time()
+
+
+        for refs in chunk_object_ref:
+            del refs
+        del chunk_object_ref
+        gc.collect()
+
+        for refs in embedding_tasks_ref:
+            del refs
+        del embedding_tasks_ref
+        gc.collect()
+
+
+        # Flatten the embeddings list
+        embeddings = [embedding for sublist in embeddings for embedding in sublist]
+
+        print("Time taken to generate sparse embeddings with Ray Distributed Computing:", end_time - start_time, "seconds")
+
+        return embeddings
 
     def search(self,query_text: str):
         # Compute sparse and dense vectors
-        dense_vector = self.dense_encoder.encode([query_text])[0]
-        sparse_vector = self.sparse_encoder.encode([query_text])[0]
+        dense_vector = self.dense_model.encode([query_text])[0]
+        sparse_vector = self.sparse_model.encode([query_text])[0]
         
         # Convert sparse embedding to the format expected by Qdrant
         sparse_vector_qdrant = SparseVector(
@@ -209,23 +304,3 @@ class EmbeddingPipeline:
         )
 
         return search_results
-    
-    def chunk_encode_dense(self, texts: List[str]):
-        # Use existing workers instead of creating new ones
-        chunk_size = max(1, len(texts) // self.num_workers)
-        document_chunks = [texts[i:i+chunk_size] for i in range(0, len(texts), chunk_size)]
-        
-        # Reuse worker pool which got initialized in __init__ of EmbeddingPipeline
-        start_time = time.time()
-        embedding_tasks = [worker.encode.remote(chunk) for worker, chunk in zip(self.worker_pool, document_chunks)]
-        embeddings = ray.get(embedding_tasks)
-        end_time = time.time()
-
-        # Flatten the embeddings list
-        embeddings = [embedding for sublist in embeddings for embedding in sublist]
-
-        print("Time taken to generate embeddings with Ray Distributed Computing:", end_time - start_time, "seconds")
-
-        print("Generated embeddings:", embeddings)
-        return embeddings
-    

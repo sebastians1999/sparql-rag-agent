@@ -1,1 +1,5 @@
 .env
+vectordb
+embeddings_model_cache
+upload_logs
+__pycache__
