@@ -11,6 +11,7 @@ import time
 import ray
 import gc
 import json
+import uuid
 from upload_tracker import UploadTracker
 from qdrant_client.models import (
     Distance,
@@ -60,9 +61,15 @@ class EmbeddingPipeline:
         host: str = "localhost",
         grpc_port: int = 6334,
         retrieval_mode: str = RetrievalMode.HYBRID,
-        num_workers: int = 3,
-        log_dir: str = "./upload_logs"
+        num_workers: int = 4,
+        log_dir: str = "./upload_logs",
+        recreate_collection: bool = False
     ):
+        self.dense_model_name = dense_model_name
+        self.sparse_model_name = sparse_model_name
+        self.recreate_collection = recreate_collection
+        self.collection_name = collection_name
+        self.retrieval_mode = retrieval_mode
         # Create a pool of workers once
         print("Creating embedding workers...")
         self.num_workers = num_workers
@@ -77,11 +84,9 @@ class EmbeddingPipeline:
             timeout=60
         )
 
-        self.client.set_model(dense_model_name)
-        self.client.set_sparse_model(sparse_model_name)
+        self.client.set_model(self.dense_model_name)
+        self.client.set_sparse_model(self.sparse_model_name)
     
-        self.collection_name = collection_name
-        self.retrieval_mode = retrieval_mode
         
         # Initialize upload tracker
         self.upload_tracker = UploadTracker(collection_name, log_dir)
@@ -94,15 +99,21 @@ class EmbeddingPipeline:
         try:
             # Check if collection exists
             collections = self.client.get_collections()
-            if self.collection_name in [c.name for c in collections.collections]:
-                print(f"Collection '{self.collection_name}' exists, recreating...")
-                self.client.delete_collection(self.collection_name)
-            
-            print(f"Creating new collection '{self.collection_name}'")
 
-            self.client.create_collection(
-                collection_name=self.collection_name,
-                vectors_config={
+            if self.recreate_collection:
+                self.client.delete_collection(self.collection_name)
+                print(f"Collection '{self.collection_name}' deleted successfully")
+                print("Recreating collection...")
+                
+            if self.collection_name in [c.name for c in collections.collections] and not self.recreate_collection:
+                print(f"Collection '{self.collection_name}' exists, skipping initialization")
+
+            else:
+                print(f"Creating new collection '{self.collection_name}'")
+
+                self.client.create_collection(
+                    collection_name=self.collection_name,
+                    vectors_config={
                     "dense": models.VectorParams(
                         size=384,
                         distance=models.Distance.COSINE
@@ -119,14 +130,14 @@ class EmbeddingPipeline:
                         )
                     )
                 }
-            )
-            print("Collection initialized successfully")
+                )
+                print("Collection initialized successfully")
             
         except Exception as e:
             print(f"Error in collection initialization: {str(e)}")
             raise
 
-    def add_documents(self, documents: List[Dict[str, str]], batch_size: int = 300, skip_existing: bool = True):
+    def add_documents(self, documents: List[Dict[str, str]], batch_size: int = 144, skip_existing: bool = True):
         """Add documents to the collection in batches"""
         
         # Filter out already uploaded documents if skip_existing is True
@@ -138,6 +149,8 @@ class EmbeddingPipeline:
         
         total_docs = len(documents)
         print(f"Adding {total_docs} documents in batches of {batch_size}")
+        
+        batch_counter = 0
         
         for i in range(0, total_docs, batch_size):
             batch = documents[i:i + batch_size]
@@ -161,9 +174,12 @@ class EmbeddingPipeline:
                     sparse_vector = SparseVector(indices=sparse_vector.indices.tolist(), values=sparse_vector.values.tolist())
                     batch_ids.append(doc['uri'])
 
+                    # Generate a UUID based on the URI for consistency
+                    # This ensures the same URI always gets the same UUID
+                    point_id = str(uuid.uuid5(uuid.NAMESPACE_URL, doc['uri']))
 
                     point = PointStruct(
-                        id=i + idx,
+                        id=point_id,
                         vector={
                             "dense": dense_vector.tolist(),
                             "sparse": sparse_vector
@@ -175,10 +191,11 @@ class EmbeddingPipeline:
                             "description": doc.get('description', '')
                         }
                     )
+                    #print(point.id)
                     points.append(point)
 
-                print("Upserting points...")
-                self.client.upsert(
+                print("Uploading points...")
+                self.client.upload_points(
                     collection_name=self.collection_name,
                     points=points
                 )
@@ -187,6 +204,19 @@ class EmbeddingPipeline:
                 self.upload_tracker.mark_as_uploaded(batch_ids)
                 
                 print(f"✓ Batch {i//batch_size + 1}/{(total_docs + batch_size - 1)//batch_size} - Total uploaded: {self.upload_tracker.get_uploaded_count()}")
+                
+                batch_counter += 1
+
+                if batch_counter == 100:
+                    print("Shutting down Ray to free up resources...")
+                    ray.shutdown()
+                    print("Waiting 10 seconds...")
+                    time.sleep(10)
+                    batch_counter = 0
+                    ray.init()
+                    print("Initialized Ray again and recreated embedding workers...")
+                    self.worker_pool = [EmbeddingWorker.remote(model_name_dense=self.dense_model_name, model_name_sparse=self.sparse_model_name) for _ in range(self.num_workers)]
+                    
                 
             except Exception as e:
                 print(f"Error processing batch {i//batch_size + 1}: {str(e)}")
@@ -200,8 +230,8 @@ class EmbeddingPipeline:
         #     )
         # )
         # Cleanup resources
-        cleanup_tasks = [worker.cleanup.remote() for worker in self.worker_pool]
-        ray.get(cleanup_tasks)
+        # cleanup_tasks = [worker.cleanup.remote() for worker in self.worker_pool]
+        # ray.get(cleanup_tasks)
         ray.shutdown()
 
     def chunk_encode_dense(self, texts: List[str]):

@@ -4,3 +4,5 @@ embeddings_model_cache
 upload_logs
 __pycache__
 biomedical_entities_uploaded_ids.json
+entities_dataframe.pkl
+entities_dataframe.csv

@@ -31,7 +31,7 @@ async def question_understanding(state: State, config: RunnableConfig) -> Dict[s
 
     try:
         configuration = Configuration.from_runnable_config(config)
-        llm = get_llm(configuration)
+        llm = get_llm(configuration).with_structured_output(StructuredQuestion)
 
         prompt_template = ChatPromptTemplate.from_messages(
             [
@@ -46,15 +46,7 @@ async def question_understanding(state: State, config: RunnableConfig) -> Dict[s
             },
         )
 
-        response = await llm.invoke(message_value)
-
-        #ensure the response is a valid JSON
-        try:
-            structured_question = StructuredQuestion.model_validate_json(response.content)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Failed to parse LLM response as JSON: {e}")
-        except ValidationError as e:
-            raise ValueError(f"Failed to validate structured question: {e}")
+        structured_question: StructuredQuestion = await llm.ainvoke(message_value)
 
         return {
             "structured_question": structured_question,

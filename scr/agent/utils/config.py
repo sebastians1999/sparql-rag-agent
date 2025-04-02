@@ -19,7 +19,7 @@ class LLMConfig:
     provider: str = "groq"
     model_name: str = "deepseek-r1-distill-llama-70b"
     temperature: float = 1.0
-    max_tokens: Optional[int] = 600
+    max_tokens: Optional[int] = 1000
     top_p: float = 1.0
     frequency_penalty: float = 0.0
     presence_penalty: float = 0.0
@@ -34,10 +34,14 @@ class RAGConfig:
     """Configuration for Retrieval Augmented Generation."""
     
     vectordb_url: str = "http://vectordb:6334/"
-    collection_name: Optional[str] = "test_collection"
-    # TODO: still need to change these models accordingly
-    embedding_model: str = "BAAI/bge-small-en-v1.5"
+    host: str = "localhost"
+    grpc_port: int = 6334
+
+    collection_name: Optional[str] = "chebi_collection"
+    dense_embedding_model: str = "BAAI/bge-small-en-v1.5"
     sparse_embedding_model: str = "Qdrant/bm25"
+    embeddings_cache_dir: str = "./embeddings_model_cache"
+    
     chunk_size: int = 1000
     chunk_overlap: int = 200
     top_k: int = 5
@@ -106,4 +110,4 @@ class Configuration:
             rag_config=rag_config,
             logging_config=logging_config,
             **top_level_params
-        ) 
+        )

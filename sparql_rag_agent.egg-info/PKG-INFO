@@ -19,8 +19,9 @@ Requires-Dist: langchain-qdrant>=0.2.0
 Requires-Dist: pydantic>=2.10.6
 Requires-Dist: typing-extensions>=4.12.2
 Requires-Dist: langchain-together>=0.3.0
-Requires-Dist: torch>=2.6.0
-Requires-Dist: torchvision>=0.21.0
 Requires-Dist: sentence-transformers>=3.4.1
 Requires-Dist: transformers>=4.50.1
 Requires-Dist: ray[data,serve,train,tune]
+Requires-Dist: scikit-learn>=1.6.1
+Requires-Dist: ranx>=0.3.20
+Requires-Dist: langchain-groq>=0.2.4
