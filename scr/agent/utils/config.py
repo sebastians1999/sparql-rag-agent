@@ -1,7 +1,7 @@
 """Define the configurable parameters for the SPARQL RAG agent."""
 
 from __future__ import annotations
-
+import os
 from dataclasses import dataclass, field, fields
 from typing import Optional, Dict, Any, List
 
@@ -11,15 +11,27 @@ from langchain_core.runnables import RunnableConfig
 @dataclass
 class LLMConfig:
     """Configuration for the Language Model."""
+
+    # Supported models for parsing:
+    # meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo(32K context)
+    # meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo
+    # meta-llama/Llama-3.2-3B-Instruct-Turbo
+    # meta-llama/Llama-3.3-70B-Instruct-Turbo
+    # deepseek-ai/DeepSeek-V3
     
-    # provider: str = "together" 
-    # model_name: str = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free"
+    provider: str = "together" 
+    # #model_1 is the default model
+    model_1: str = "meta-llama/Llama-3.3-3B-Instruct-Turbo"
+    #model_2: str = "meta-llama/Llama-3.2-3B-Instruct-Turbo"
+    model_2
     # model_name: str = "llama3-8b-8192"
-    # provider: str = "groq"
-    provider: str = "groq"
-    model_name: str = "deepseek-r1-distill-llama-70b"
+    #provider: str = "groq"
+    #provider: str = "groq"
+    #model_1: str = "deepseek-r1-distill-llama-70b"
+    #provider: str = "google-genai"
+    #model_1: str = "models/gemini-2.5.pro-exp-03-25"
     temperature: float = 1.0
-    max_tokens: Optional[int] = 1000
+    max_tokens: Optional[int] = 4000
     top_p: float = 1.0
     frequency_penalty: float = 0.0
     presence_penalty: float = 0.0

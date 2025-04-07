@@ -1,5 +1,6 @@
 import os
 import json
+import uuid
 from typing import List, Dict, Optional, Callable, Set, Union
 
 class UploadTracker:
@@ -33,12 +34,16 @@ class UploadTracker:
                 json.dump(list(self.uploaded_ids), f)
         except Exception as e:
             print(f"Error saving upload log: {str(e)}")
-            
-    def is_uploaded(self, entity_id: str) -> bool:
-        return entity_id in self.uploaded_ids
+    
+    def generate_uuid_from_uri(self, uri: str) -> str:
+        """Generate a UUID based on the URI for consistency"""
+        return str(uuid.uuid5(uuid.NAMESPACE_URL, uri))
         
-    def mark_as_uploaded(self, entity_ids: List[str]):
-        self.uploaded_ids.update(entity_ids)
+    def is_uploaded(self, uuid_str: str) -> bool:
+        return uuid_str in self.uploaded_ids
+        
+    def mark_as_uploaded(self, uuid_list: List[str]):
+        self.uploaded_ids.update(uuid_list)
         self._save_log()
         
     def get_uploaded_count(self) -> int:
@@ -53,8 +58,9 @@ class UploadTracker:
     def filter_new_entities(self, documents: List[Dict]) -> List[Dict]:
         new_docs = []
         for doc in documents:
-            entity_id = self.extract_uri(doc)
-            if not self.is_uploaded(entity_id):
+            uri = self.extract_uri(doc)
+            uuid_str = self.generate_uuid_from_uri(uri)
+            if not self.is_uploaded(uuid_str):
                 new_docs.append(doc)
                 
         skipped = len(documents) - len(new_docs)
@@ -64,15 +70,16 @@ class UploadTracker:
         return new_docs
 
 def process_batch(tracker: UploadTracker, batch: List[Dict], process_func: Callable):
-    batch_ids = []
+    batch_uuids = []
     
     for doc in batch:
-        entity_id = tracker.extract_uri(doc)
-        batch_ids.append(entity_id)
+        uri = tracker.extract_uri(doc)
+        uuid_str = tracker.generate_uuid_from_uri(uri)
+        batch_uuids.append(uuid_str)
     
     try:
         process_func(batch)
-        tracker.mark_as_uploaded(batch_ids)
+        tracker.mark_as_uploaded(batch_uuids)
         print(f"Batch processed - Total uploaded: {tracker.get_uploaded_count()}")
         return True
     except Exception as e:

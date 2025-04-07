@@ -1,13 +1,13 @@
 from scr.agent.state.state import State, StepOutput
-from langchain_together import Together
 from langchain_core.messages import AIMessage
 from langchain_core.prompts import ChatPromptTemplate
 from scr.agent.prompts.prompts import QUERY_GENERATION_PROMPT
-from typing import List, Dict, Any
+from typing import List, Dict, Optional
 from scr.agent.utils.config import Configuration
 from langchain_core.runnables import RunnableConfig
 from scr.agent.utils.llm_utils import get_llm
 import re
+
 
 
 
@@ -32,23 +32,22 @@ async def query_generator(state: State, config: RunnableConfig) -> Dict[str, Lis
         prompt_template = ChatPromptTemplate.from_messages(
             [
                 ("system", QUERY_GENERATION_PROMPT),
-                ("placeholder", "{question} {potential_entities} {retrieved_documents}"),
+                ("user", "{question} {potential_entities}"),
+                #add retrieved documents later("user", "{retrieved_documents}"),
             ]
         )
 
-        message = prompt_template.invoke(
-            {
-                "question": state.messages[0].content if state.messages else "Generate a SPARQL query",
-                "potential_entities": state.extracted_entities,
-            }
+        formatted_messages = prompt_template.format_messages(
+            question=state.messages[0].content if state.messages else "Generate a SPARQL query",
+            potential_entities=state.extracted_entities if hasattr(state, 'extracted_entities') else ""
         )
         
-        response_message = await llm.ainvoke(message)
+        response_message = await llm.ainvoke(formatted_messages)
 
         extracted_queries = extract_sparql_queries(response_message.content)
 
         return {
-            "structured_output": extracted_queries,
+            "structured_output": extracted_queries[0] if extracted_queries else "",
             "steps": [
                 StepOutput(
                     label="Generated SPARQL query",

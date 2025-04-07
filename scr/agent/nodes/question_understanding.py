@@ -31,8 +31,8 @@ async def question_understanding(state: State, config: RunnableConfig) -> Dict[s
 
     try:
         configuration = Configuration.from_runnable_config(config)
-        llm = get_llm(configuration).with_structured_output(StructuredQuestion)
-
+        llm = get_llm(configuration).with_structured_output(schema = StructuredQuestion)
+        
         prompt_template = ChatPromptTemplate.from_messages(
             [
                 ("system", EXTRACTION_PROMPT),
@@ -55,20 +55,20 @@ async def question_understanding(state: State, config: RunnableConfig) -> Dict[s
                     label=f"Extracted {len(structured_question.question_steps)} steps and {len(structured_question.extracted_classes)} classes",
                     details=f"""Intent: {structured_question.intent.replace("_", " ")}
 
-    Steps to answer the user question:
+Steps to answer the user question:
 
-    {chr(10).join(f"- {step}" for step in structured_question.question_steps)}
+{chr(10).join(f"- {step}" for step in structured_question.question_steps)}
 
-    Potential classes:
+Potential classes:
 
-    {chr(10).join(f"- {cls}" for cls in structured_question.extracted_classes)}
+{chr(10).join(f"- {cls}" for cls in structured_question.extracted_classes)}
 
-    Potential entities:
+Potential entities:
 
-    {chr(10).join(f"- {entity}" for entity in structured_question.extracted_entities)}""",
-                )
-            ],
-        }
+{chr(10).join(f"- {entity}" for entity in structured_question.extracted_entities)}""",
+                    )
+                ],
+            }
     except Exception as e:
         return {
             "error": str(e),

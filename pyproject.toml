@@ -19,19 +19,27 @@ dependencies = [
     "langchain-qdrant>=0.2.0",
     "pydantic>=2.10.6",
     "typing-extensions>=4.12.2",
-    "langchain-together>=0.3.0",
     "sentence-transformers>=3.4.1",
     "transformers>=4.50.1",
     "ray[data,train,tune,serve]",
     "scikit-learn>=1.6.1",
     "ranx>=0.3.20",
     "langchain-groq>=0.2.4",
+    "nltk>=3.9.1",
+    "python-dotenv>=1.1.0",
+    "datasets>=3.5.0",
+    "langchain-together>=0.3.0",
+    "langchain-google-genai>=2.1.2",
 ]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["scr"]
 
 [[tool.uv.index]]
 name = "pytorch-mps"
 url = "https://download.pytorch.org/whl/nightly/cpu"
 explicit = true
-
-
-
