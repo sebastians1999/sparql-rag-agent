@@ -1,0 +1,62 @@
+[
+  {
+    "resource": "https://sparql.swisslipids.org/.well-known/sparql-examples/5",
+    "natural_language_question": "For a given lipid (SWISSLIPID:000399814, Ceramide), return a list of all corresponding reactions (Rhea IDs and equation).\nThis query does consider the hierarchy: it looks for reactions involving the specified lipid and/or its more specific forms.",
+    "query": "PREFIX SWISSLIPID: <https://swisslipids.org/rdf/SLM_>\nPREFIX owl: <http://www.w3.org/2002/07/owl#>\nPREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\nPREFIX rh: <http://rdf.rhea-db.org/>\n\n# Example 5\nSELECT ?startId ?startName ?id ?name ?chebi ?rhea ?rheaEquation \nWHERE\n{\n  # SwissLipids query (list of) identifier(s)\n  VALUES ?startId { SWISSLIPID:000399814 }\n  # name\n  ?startId rdfs:label ?startName .\n  # Retrieve children lipids \n  ?id rdfs:subClassOf* ?startId .\n  ?id rdfs:label ?name .\n  # ChEBI x-ref\n  ?id owl:equivalentClass ?chebi .\n  # federated query to Rhea\n  SERVICE <https://sparql.rhea-db.org/sparql> {\n  \t?rhea rh:equation ?rheaEquation .\n  \t?rhea rh:side/rh:contains/rh:compound/rh:chebi ?chebi .\n  }    \n} \nORDER BY  ?startId ?id",
+    "target_endpoint": "https://sparql.swisslipids.org/sparql/",
+    "federates_with": "https://sparql.rhea-db.org/sparql",
+    "endpoint_set": "SwissLipids",
+    "file_path": "SwissLipids/5.ttl",
+    "filename": "5.ttl"
+  },
+  {
+    "resource": "https://sparql.uniprot.org/.well-known/sparql-examples/50",
+    "natural_language_question": "Where are the human genes encoding enzymes metabolizing N-acyl\nsphingosines expressed in the human body (federated query, with Rhea and Bgee)",
+    "query": "PREFIX CHEBI: <http://purl.obolibrary.org/obo/CHEBI_>\nPREFIX genex: <http://purl.org/genex#>\nPREFIX lscr: <http://purl.org/lscr#>\nPREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\nPREFIX rh: <http://rdf.rhea-db.org/>\nPREFIX taxon: <http://purl.uniprot.org/taxonomy/>\nPREFIX up: <http://purl.uniprot.org/core/>\n\nSELECT\n  DISTINCT\n    ?chebi\n    ?reaction\n    ?protein ?ensemblGene\n    ?anatomicEntityLabel\n    ?anatomicEntity\nWHERE {\n  SERVICE <https://sparql.rhea-db.org/sparql> {\n    ?reaction rdfs:subClassOf rh:Reaction .\n    ?reaction rh:equation ?reactionEquation .\n    ?reaction rh:side ?reactionSide .\n    ?reactionSide rh:contains ?participant .\n    ?participant rh:compound ?compound .\n    ?compound rh:chebi ?chebi .\n    ?chebi rdfs:subClassOf* CHEBI:52639\n}\n  ?protein up:organism taxon:9606 .\n  ?protein up:annotation ?a .\n  ?a a up:Catalytic_Activity_Annotation .\n  ?a up:catalyticActivity ?ca .\n  ?ca up:catalyzedReaction ?reaction .\n  ?protein rdfs:seeAlso / up:transcribedFrom ?ensemblGene .\n\n  SERVICE  <https://www.bgee.org/sparql/> {\n    ?gene genex:isExpressedIn ?anatomicEntity .\n    ?gene lscr:xrefEnsemblGene ?ensemblGene .\n    ?anatomicEntity rdfs:label ?anatomicEntityLabel .\n  }\n}",
+    "target_endpoint": "https://sparql.uniprot.org/sparql/",
+    "federates_with": "https://sparql.rhea-db.org/sparql",
+    "endpoint_set": "Uniprot",
+    "file_path": "UniProt/50_tissues_where_genes_sphingosines_are_expressed.ttl",
+    "filename": "50_tissues_where_genes_sphingosines_are_expressed.ttl"
+  },
+  {
+    "resource": "https://sparql.uniprot.org/.well-known/sparql-examples/51",
+    "natural_language_question": "Find all proteins linked to arachidonate (CHEBI:32395)",
+    "query": "PREFIX CHEBI: <http://purl.obolibrary.org/obo/CHEBI_>\nPREFIX rh: <http://rdf.rhea-db.org/>\nPREFIX skos: <http://www.w3.org/2004/02/skos/core#>\nPREFIX up: <http://purl.uniprot.org/core/>\n\n\nSELECT \n    DISTINCT\n        ?uniprot\n        ?uniprotID\n        ?recname\n        ?gene\n        ?chebi\n        ?uniprotName\nWHERE {\n  SERVICE <https://sparql.rhea-db.org/sparql> {\n     VALUES (?chebi) { (CHEBI:32395) }\n     ?rhea rh:side/rh:contains/rh:compound ?compound .\n     ?compound rh:chebi ?chebi .\n     ?chebi up:name ?uniprotName .\n  }\n  ?uniprot up:annotation/up:catalyticActivity/up:catalyzedReaction ?rhea .\n  ?uniprot up:mnemonic ?uniprotID .\n  ?uniprot up:recommendedName/up:fullName ?recname .\n  OPTIONAL {?uniprot up:encodedBy/skos:prefLabel ?gene .}\n}",
+    "target_endpoint": "https://sparql.uniprot.org/sparql/",
+    "federates_with": "https://sparql.rhea-db.org/sparql",
+    "endpoint_set": "Uniprot",
+    "file_path": "UniProt/51_all_proteins_linked_to_arachidonate.ttl",
+    "filename": "51_all_proteins_linked_to_arachidonate.ttl"
+  },
+  {
+    "resource": "https://sparql.rhea-db.org/.well-known/sparql-examples/12",
+    "natural_language_question": "Select all Rhea reactions linked to protein sequences (enzymes and transporters) in UniProtKB",
+    "query": "PREFIX rh: <http://rdf.rhea-db.org/>\nPREFIX up: <http://purl.uniprot.org/core/>\n\n# Query 12\n# Select all Rhea reactions used to annotate enzyme sequences in UniProtKB\n# return the number of UniProtKB entries\n# Federated query using a service to UniProt SPARQL endpoint\n#\n# This query corresponds to the Rhea website query:\n# https://www.rhea-db.org/rhea?query=uniprot:*\n#\nSELECT ?uniprotCount ?rhea ?accession ?equation \nWHERE {\n  SERVICE <https://sparql.uniprot.org/sparql> { \n  \tSELECT ?rhea (count(?uniprot) as ?uniprotCount) {\n      ?uniprot up:annotation/up:catalyticActivity/up:catalyzedReaction ?rhea . \n  \t}\n  \tGROUP BY ?rhea\n  }\n  ?rhea rh:accession ?accession .\n  ?rhea rh:equation ?equation .\n}",
+    "target_endpoint": "https://sparql.rhea-db.org/sparql",
+    "federates_with": "https://sparql.uniprot.org/sparql",
+    "endpoint_set": "Rhea",
+    "file_path": "Rhea/12.ttl",
+    "filename": "12.ttl"
+  },
+  {
+    "resource": "https://sparql.rhea-db.org/.well-known/sparql-examples/112_Total_number_of_reaction_ec_protein_links",
+    "natural_language_question": "Total number of <reaction> <ec> <protein> links",
+    "query": "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\nPREFIX rh:<http://rdf.rhea-db.org/>\nPREFIX ec:<http://purl.uniprot.org/enzyme/>\nPREFIX up:<http://purl.uniprot.org/core/>\n\nSELECT\n  (count(?reaction) as ?reactionEcProteinLinkCount)\nWHERE {\n  ?reaction rdfs:subClassOf rh:Reaction .\n  ?reaction rh:ec ?enzyme\n  SERVICE <http://sparql.uniprot.org/sparql> {\n    ?protein up:reviewed true .\n    ?protein up:enzyme ?enzyme.\n  }\n}",
+    "target_endpoint": "https://sparql.rhea-db.org/sparql",
+    "federates_with": "http://sparql.uniprot.org/sparql",
+    "endpoint_set": "Rhea",
+    "file_path": "Rhea/112_Total_number_of_reaction_ec_protein_links.ttl",
+    "filename": "112_Total_number_of_reaction_ec_protein_links.ttl"
+  },
+  {
+    "resource": "https://sparql.rhea-db.org/.well-known/sparql-examples/117_Retrieve_parent_reactions_and_their_catalyzing_enzymes_for_a_metabolite_that_is_not_directly_involved_in_a_reaction",
+    "natural_language_question": "Retrieve parent reactions (and their catalyzing enzymes) for a metabolite that is not directly involved in a reaction (ex: CHEBI:83137).",
+    "query": "PREFIX CHEBI: <http://purl.obolibrary.org/obo/CHEBI_>\nPREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\nPREFIX rh:<http://rdf.rhea-db.org/>\nPREFIX ec:<http://purl.uniprot.org/enzyme/>\nPREFIX up:<http://purl.uniprot.org/core/>\nPREFIX taxon:<http://purl.uniprot.org/taxonomy/>\nPREFIX keywords:<http://purl.uniprot.org/keywords/>\n\nSELECT\n  ?chebi\n  ?ecNumber\n  (count(?protein) as ?proteinCount)\n  ?reaction\n  ?equation\nWHERE {\n  ?reaction rdfs:subClassOf rh:Reaction .\n  ?reaction rh:status rh:Approved .\n  ?reaction rh:equation ?equation .\n  ?reaction rh:ec ?ecNumber .\n  ?reaction rh:side ?reactionSide .\n  ?reactionSide rh:contains ?participant .\n  ?participant rh:compound ?compound .\n  ?compound rh:chebi ?chebi .\n  CHEBI:83137 rdfs:subClassOf+ ?chebi.\n\n  SERVICE <https://sparql.uniprot.org/sparql> {\n  ?protein a up:Protein .\n  ?protein up:reviewed true .\n    {?protein up:enzyme ?ecNumber}\n  UNION\n    {?protein up:domain/up:enzyme ?ecNumber}\n  UNION\n    {?protein up:component/up:enzyme ?ecNumber} .\n  }\n} \nGROUP BY ?chebi ?ecNumber ?reaction ?equation",
+    "target_endpoint": "https://sparql.rhea-db.org/sparql",
+    "federates_with": "https://sparql.uniprot.org/sparql",
+    "endpoint_set": "Rhea",
+    "file_path": "Rhea/117_Retrieve_parent_reactions_and_their_catalyzing_enzymes_for_a_metabolite_that_is_not_directly_involved_in_a_reaction.ttl",
+    "filename": "117_Retrieve_parent_reactions_and_their_catalyzing_enzymes_for_a_metabolite_that_is_not_directly_involved_in_a_reaction.ttl"
+  }
+]

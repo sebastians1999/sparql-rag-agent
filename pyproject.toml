@@ -31,6 +31,8 @@ dependencies = [
     "langchain-together>=0.3.0",
     "langchain-google-genai>=2.1.2",
     "ipykernel>=6.29.5",
+    "requests>=2.32.3",
+    "beautifulsoup4>=4.13.3",
 ]
 
 [build-system]

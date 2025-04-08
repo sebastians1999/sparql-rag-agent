@@ -27,7 +27,7 @@ async def query_generator(state: State, config: RunnableConfig) -> Dict[str, Lis
         configuration = Configuration.from_runnable_config(config)
 
 
-        llm = get_llm(configuration, provider_key="provider_1", model_key="together_model_2")
+        llm = get_llm(configuration, provider_key="provider_1", model_key="together_model_1")
 
         prompt_template = ChatPromptTemplate.from_messages(
             [

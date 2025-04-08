@@ -1,0 +1,52 @@
+
+# Natural Language Question
+# =======================
+Total number of <reaction> <ec> <protein> links
+
+# Ground Truth Query
+# =================
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rh:<http://rdf.rhea-db.org/>
+PREFIX ec:<http://purl.uniprot.org/enzyme/>
+PREFIX up:<http://purl.uniprot.org/core/>
+
+SELECT
+  (count(?reaction) as ?reactionEcProteinLinkCount)
+WHERE {
+  ?reaction rdfs:subClassOf rh:Reaction .
+  ?reaction rh:ec ?enzyme
+  SERVICE <http://sparql.uniprot.org/sparql> {
+    ?protein up:reviewed true .
+    ?protein up:enzyme ?enzyme.
+  }
+}
+
+# Predicted Query
+# ==============
+# https://sib-federated.rhea-db.org/sparql
+PREFIX rr: <http://rdf.rhea-db.org/>
+PREFIX up: <http://purl.uniprot.org/core/>
+PREFIX rh: <http://rdf.rhea-db.org/reaction/>
+
+SELECT (SUM(?count) AS ?total_links)
+WHERE {
+  {
+    SELECT (COUNT(DISTINCT ?reaction) AS ?count)
+    WHERE {
+      SERVICE <https://sparql.rhea-db.org/sparql> {
+        ?reaction rh:ec ?ec .
+        ?reaction rh:status ?status .
+        FILTER (?status = "standard" || ?status = "unbalanced")
+      }
+    }
+  }
+  UNION
+  {
+    SELECT (COUNT(DISTINCT ?protein) AS ?count)
+    WHERE {
+      SERVICE <https://sparql.uniprot.org/sparql> {
+        ?protein up:enzyme ?ec .
+      }
+    }
+  }
+}

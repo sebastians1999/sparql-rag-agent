@@ -1,0 +1,55 @@
+
+# Natural Language Question
+# =======================
+Find all proteins linked to arachidonate (CHEBI:32395)
+
+# Ground Truth Query
+# =================
+PREFIX CHEBI: <http://purl.obolibrary.org/obo/CHEBI_>
+PREFIX rh: <http://rdf.rhea-db.org/>
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX up: <http://purl.uniprot.org/core/>
+
+
+SELECT 
+    DISTINCT
+        ?uniprot
+        ?uniprotID
+        ?recname
+        ?gene
+        ?chebi
+        ?uniprotName
+WHERE {
+  SERVICE <https://sparql.rhea-db.org/sparql> {
+     VALUES (?chebi) { (CHEBI:32395) }
+     ?rhea rh:side/rh:contains/rh:compound ?compound .
+     ?compound rh:chebi ?chebi .
+     ?chebi up:name ?uniprotName .
+  }
+  ?uniprot up:annotation/up:catalyticActivity/up:catalyzedReaction ?rhea .
+  ?uniprot up:mnemonic ?uniprotID .
+  ?uniprot up:recommendedName/up:fullName ?recname .
+  OPTIONAL {?uniprot up:encodedBy/skos:prefLabel ?gene .}
+}
+
+# Predicted Query
+# ==============
+# https://sparql.rhea-db.org/sparql
+PREFIX obo: <http://purl.obolibrary.org/obo/>
+PREFIX rhea: <http://rdf.rhea-db.org/reaction/>
+
+SELECT DISTINCT ?protein ?reaction ?ecnumber
+WHERE {
+    # Identify the CHEBI ID for arachidonate
+    VALUES ?chebi {obo:CHEBI_32395}
+    
+    # Query Rhea to find reactions associated with arachidonate
+    SERVICE <https://sparql.rhea-db.org/sparql> {
+        ?reaction rhea:side ?side .
+        ?side rhea:contains ?chebi .
+        ?reaction rhea:catalyzedBy ?protein .
+    }
+    
+    # Retrieve EC numbers associated with the reactions
+    ?reaction obo:RO_0000057 ?ecnumber .
+}

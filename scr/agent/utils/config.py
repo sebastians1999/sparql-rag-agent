@@ -27,7 +27,7 @@ class LLMConfig:
     
     # Model configurations for each provider
     # Together models
-    together_model_1: str = "meta-llama/Llama-4-Scout-17B-16E-Instruct"
+    together_model_1: str = "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8"
     together_model_2: str = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
     
     # # OpenAI models

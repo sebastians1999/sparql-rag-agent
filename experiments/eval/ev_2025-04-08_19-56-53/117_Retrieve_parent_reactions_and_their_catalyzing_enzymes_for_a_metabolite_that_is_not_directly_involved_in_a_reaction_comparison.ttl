@@ -1,0 +1,77 @@
+
+# Natural Language Question
+# =======================
+Retrieve parent reactions (and their catalyzing enzymes) for a metabolite that is not directly involved in a reaction (ex: CHEBI:83137).
+
+# Ground Truth Query
+# =================
+PREFIX CHEBI: <http://purl.obolibrary.org/obo/CHEBI_>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rh:<http://rdf.rhea-db.org/>
+PREFIX ec:<http://purl.uniprot.org/enzyme/>
+PREFIX up:<http://purl.uniprot.org/core/>
+PREFIX taxon:<http://purl.uniprot.org/taxonomy/>
+PREFIX keywords:<http://purl.uniprot.org/keywords/>
+
+SELECT
+  ?chebi
+  ?ecNumber
+  (count(?protein) as ?proteinCount)
+  ?reaction
+  ?equation
+WHERE {
+  ?reaction rdfs:subClassOf rh:Reaction .
+  ?reaction rh:status rh:Approved .
+  ?reaction rh:equation ?equation .
+  ?reaction rh:ec ?ecNumber .
+  ?reaction rh:side ?reactionSide .
+  ?reactionSide rh:contains ?participant .
+  ?participant rh:compound ?compound .
+  ?compound rh:chebi ?chebi .
+  CHEBI:83137 rdfs:subClassOf+ ?chebi.
+
+  SERVICE <https://sparql.uniprot.org/sparql> {
+  ?protein a up:Protein .
+  ?protein up:reviewed true .
+    {?protein up:enzyme ?ecNumber}
+  UNION
+    {?protein up:domain/up:enzyme ?ecNumber}
+  UNION
+    {?protein up:component/up:enzyme ?ecNumber} .
+  }
+} 
+GROUP BY ?chebi ?ecNumber ?reaction ?equation
+
+# Predicted Query
+# ==============
+# https://www.ebi.ac.uk/rdf/services/sparql
+PREFIX obo: <http://purl.obolibrary.org/obo/>
+PREFIX rhea: <http://rdf.rhea-db.org/>
+PREFIX chebi: <http://purl.obolibrary.org/obo/CHEBI_>
+
+SELECT DISTINCT ?parent_reaction ?enzyme ?metabolite
+WHERE {
+  # Define the given metabolite
+  VALUES ?metabolite {obo:CHEBI_83137}
+  
+  # Query Rhea to find reactions involving the given metabolite
+  SERVICE <https://sparql.rhea-db.org/sparql> {
+    ?reaction rhea:side ?side .
+    ?side ?p ?metabolite .
+    ?reaction rhea:equation ?equation .
+    ?reaction rhea:direction ?direction .
+    
+    # Identify the parent reaction
+    ?parent_reaction rhea:reaction ?reaction .
+  }
+  
+  # Query Rhea to find enzymes catalyzing the parent reaction
+  SERVICE <https://sparql.rhea-db.org/sparql> {
+    ?parent_reaction rhea:catalyzedBy ?enzyme .
+  }
+  
+  # Optionally, fetch additional information about the metabolite from ChEBI
+  SERVICE <https://www.ebi.ac.uk/rdf/services/sparql> {
+    ?metabolite obo:IAO_0000115 ?description .
+  }
+}

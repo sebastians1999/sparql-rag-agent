@@ -14,15 +14,16 @@ from datasets import Dataset
 from experiments.utilities.metrics import eval_pairs
 import nltk
 import json
-
+from experiments.utilities.sparql_syntax_validation import validate_sparql_syntax
 
 
 
 class AgentEvaluator:
-    def __init__(self, dataset_path=None, output_dir=None, endpoint_sets=None, project_name_langsmith: str ="sparql-rag-agent", test: bool = False):
+    def __init__(self, dataset_path=None, output_dir=None, endpoint_sets=None, project_name_langsmith: str ="sparql-rag-agent", test: bool = False, experiment_dir: str = None):
         
         self.endpoint_sets = endpoint_sets
-        self.output_dir = process_specific_datasets_and_files(self.endpoint_sets)
+        self.experiment_dir = experiment_dir
+        self.output_dir = process_specific_datasets_and_files(self.endpoint_sets, output_dir=self.experiment_dir)
         self.test_dataset_path = os.path.join(self.output_dir, 'testset_meta_data.json')
         self.test_dataset = Dataset.from_dict(load_data_from_file(self.test_dataset_path))
         self.graph = create_graph()
@@ -75,6 +76,7 @@ class AgentEvaluator:
                 "run_id_langsmith": str(first_run.id),
                 "in_dataset": first_run.in_dataset,
                 "execution_time": str(execution_time),
+
                 # Add the specific metrics for the sparql_query_construction run
                 "sparql_construction_prompt_tokens": sparql_construction_run.prompt_tokens or 0,
                 "sparql_construction_completion_tokens": sparql_construction_run.completion_tokens or 0,
@@ -82,6 +84,8 @@ class AgentEvaluator:
                 "sparql_construction_prompt_cost": sparql_construction_run.prompt_cost or 0,
                 "sparql_construction_completion_cost": sparql_construction_run.completion_cost or 0,
                 "sparql_construction_total_cost": sparql_construction_run.total_cost or 0,
+                
+
                 # Keep the original metrics too
                 "prompt_tokens": first_run.prompt_tokens or 0,
                 "completion_tokens": first_run.completion_tokens or 0,
@@ -155,7 +159,7 @@ class AgentEvaluator:
                     "total_cost": result["total_cost"],
                     "evaluation_timestamp": datetime.now().isoformat()
                 }
-                
+
                 if "sparql_construction_prompt_tokens" in result:
                     updated_item["sparql_construction_prompt_tokens"] = result["sparql_construction_prompt_tokens"]
                     updated_item["sparql_construction_completion_tokens"] = result["sparql_construction_completion_tokens"]
@@ -163,6 +167,12 @@ class AgentEvaluator:
                     updated_item["sparql_construction_prompt_cost"] = result["sparql_construction_prompt_cost"]
                     updated_item["sparql_construction_completion_cost"] = result["sparql_construction_completion_cost"]
                     updated_item["sparql_construction_total_cost"] = result["sparql_construction_total_cost"]
+
+
+                # Validate SPARQL syntax
+                is_valid, error = validate_sparql_syntax(updated_item["predicted_query"])
+                updated_item["is_valid_sparql"] = is_valid
+                updated_item["sparql_syntax_error"] = error
                 
                 updated_results.append(updated_item)
             except Exception as e:
@@ -178,8 +188,6 @@ class AgentEvaluator:
 
         # for item in self.updated_dataset:
         #     item["metrics"] = eval_pairs(zip(item["ground_truth_query"], item["predicted_query"]))
-
-        # TODO: Implement sparql validation tool
 
         with open(self.evaluation_dataset_path, 'w', encoding='utf-8') as f:
             json.dump(self.updated_dataset.to_list(), f, indent=2, ensure_ascii=False)
@@ -200,3 +208,5 @@ class AgentEvaluator:
                 self.output_dir,
                 filename
             )
+
+        return self.evaluation_dataset_path

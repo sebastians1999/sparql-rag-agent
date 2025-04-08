@@ -182,7 +182,7 @@ def process_specific_datasets_and_files(endpoint_files_map=None, dataset_dir=Non
                            e.g., {"Uniprot": ["29.ttl", "20.ttl"], "Rhea": []}
                            Note: If an empty list is provided for a dataset, all files in that dataset will be processed
         dataset_dir: Directory containing the federated SPARQL dataset
-        output_dir: Base directory for output files
+        output_dir: Base directory for output files. If None, defaults to 'experiments/eval'
         
     Returns:
         The directory path where the metadata file was stored
@@ -200,11 +200,15 @@ def process_specific_datasets_and_files(endpoint_files_map=None, dataset_dir=Non
         experiments_dir = os.path.dirname(os.path.dirname(__file__))
         dataset_dir = os.path.join(experiments_dir, "federated_sparql_dataset/examples_federated_02.04.2025")
     
-    # Set the correct output directory (experiments/eval)
+    # Set the correct output directory
     if output_dir is None:
-        # Get the experiments directory (parent of utilities)
+        # Default to experiments/eval if no output_dir is provided
         experiments_dir = os.path.dirname(os.path.dirname(__file__))
         output_dir = os.path.join(experiments_dir, "eval")
+    elif not os.path.isabs(output_dir):
+        # If a relative path is provided, make it relative to the experiments directory
+        experiments_dir = os.path.dirname(os.path.dirname(__file__))
+        output_dir = os.path.join(experiments_dir, output_dir)
     
     # Ensure the output directory exists
     if not os.path.exists(output_dir):
