@@ -18,27 +18,58 @@ class LLMConfig:
     # meta-llama/Llama-3.2-3B-Instruct-Turbo
     # meta-llama/Llama-3.3-70B-Instruct-Turbo
     # deepseek-ai/DeepSeek-V3
+
+    provider_1: str = "together"
+    provider_2: str = "openai"
+    provider_3: str = "anthropic"
+    provider_4: str = "groq"
+    provider_5: str = "google-genai"
     
-    provider: str = "together" 
-    # #model_1 is the default model
-    model_1: str = "meta-llama/Llama-3.3-3B-Instruct-Turbo"
-    #model_2: str = "meta-llama/Llama-3.2-3B-Instruct-Turbo"
-    model_2
-    # model_name: str = "llama3-8b-8192"
-    #provider: str = "groq"
-    #provider: str = "groq"
-    #model_1: str = "deepseek-r1-distill-llama-70b"
-    #provider: str = "google-genai"
-    #model_1: str = "models/gemini-2.5.pro-exp-03-25"
+    # Model configurations for each provider
+    # Together models
+    together_model_1: str = "meta-llama/Llama-4-Scout-17B-16E-Instruct"
+    together_model_2: str = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
+    
+    # # OpenAI models
+    # openai_model_1: str = "gpt-3.5-turbo"
+    # openai_model_2: str = "gpt-4"
+    
+    # # Anthropic models
+    # anthropic_model_1: str = "claude-3-opus-20240229"
+    # anthropic_model_2: str = "claude-3-sonnet-20240229"
+    
+    # # Groq models
+    groq_model_1: str = "meta-llama/llama-4-scout-17b-16e-instruct"
+    # groq_model_2: str = "mixtral-8x7b-32768"
+    
+    # Google GenAI models
+    google_genai_model_1: str = "gemini-2.0-flash"
+    google_genai_model_2: str = "gemini-2.0-flash-thinking-exp-01-21"
+    # google_genai_model_2: str = "models/gemini-2.5.pro-exp-03-25"
+    
+    # # For backward compatibility
+    # model_1: str = "meta-llama/Llama-3.3-3B-Instruct-Turbo"
+    # model_2: str = "meta-llama/Llama-3.2-3B-Instruct-Turbo"
+    
+    # Common parameters
     temperature: float = 1.0
     max_tokens: Optional[int] = 4000
     top_p: float = 1.0
     frequency_penalty: float = 0.0
     presence_penalty: float = 0.0
     timeout: int = 60  # seconds
+    
+    # API keys for different providers
+    together_api_key: Optional[str] = os.environ.get("TOGETHER_API_KEY")
+    openai_api_key: Optional[str] = None
+    anthropic_api_key: Optional[str] = None
+    groq_api_key: Optional[str] = None
+    google_genai_api_key: Optional[str] = os.environ.get("GOOGLE_API_KEY")
+    
+    # For backward compatibility
+    provider: str = "together"
     api_key: Optional[str] = None
     api_base: Optional[str] = None
-
 
 
 @dataclass

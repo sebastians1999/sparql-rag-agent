@@ -1,9 +1,10 @@
 """
-Test script for the Google Generative AI LLM using configuration from config.py
+Test script for different LLM providers and models using configuration from config.py
 """
 
 import os
 import sys
+import time
 from dotenv import load_dotenv
 
 # Add the parent directory to sys.path to allow imports
@@ -12,57 +13,131 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 # Load environment variables from .env file
 load_dotenv()
 
-from scr.agent.utils.config import LLMConfig
-from langchain_google_genai import ChatGoogleGenerativeAI
-from scr.agent.utils.llm_utils import get_llm
 from scr.agent.utils.config import Configuration
+from scr.agent.utils.llm_utils import get_llm
 
-def test_google_llm():
-    """Test the Google Generative AI LLM with the configuration from config.py"""
+def test_provider(provider_key, model_key=None, prompt=None):
+    """Test a specific LLM provider and model"""
     
-    # Get the LLM configuration from the config file
+    if prompt is None:
+        prompt = "What is SPARQL and how is it used in semantic web applications? Keep your answer brief."
+    
+    # Get the configuration
     config = Configuration()
     
-    # Override provider to use Google for this test
-    config.llm_config.provider = "google-genai"
+    # Get the provider name from the provider key
+    provider_name = getattr(config.llm_config, provider_key)
     
-    print(f"Testing Google Generative AI with the following configuration:")
-    print(f"Provider: {config.llm_config.provider}")
-    print(f"Model 1: {config.llm_config.model_1}")
+    print(f"\n{'='*50}")
+    print(f"Testing {provider_name} provider")
+    print(f"{'='*50}")
+    
+    # Get the model name
+    if model_key:
+        model_attr = f"{provider_name}_{model_key}"
+        if hasattr(config.llm_config, model_attr):
+            model_name = getattr(config.llm_config, model_attr)
+        else:
+            print(f"Model key '{model_key}' not found for provider '{provider_name}'")
+            return
+    else:
+        # Use default model for this provider
+        model_attr = f"{provider_name}_model_1"
+        if hasattr(config.llm_config, model_attr):
+            model_name = getattr(config.llm_config, model_attr)
+        else:
+            print(f"No default model found for provider '{provider_name}'")
+            return
+    
+    # Get the API key
+    api_key_attr = f"{provider_name}_api_key"
+    api_key = os.environ.get(f"{provider_name.upper().replace('-', '_')}_API_KEY")
+    
+    if not api_key and hasattr(config.llm_config, api_key_attr):
+        api_key = getattr(config.llm_config, api_key_attr)
+    
+    # Display configuration
+    print(f"Provider: {provider_name}")
+    print(f"Model: {model_name}")
+    print(f"API key: {'*****' + api_key[-4:] if api_key else 'Not found'}")
     print(f"Temperature: {config.llm_config.temperature}")
     print(f"Max tokens: {config.llm_config.max_tokens}")
     
-    # Check if API key is set
-    api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
-        # Try to get it from config as fallback
-        api_key = config.llm_config.api_key
-        
-    print(f"API key: {'*****' + api_key[-4:] if api_key else None}")
-    if not api_key:
-        print("Error: GOOGLE_API_KEY not found in environment variables or config")
-        print("Please set the GOOGLE_API_KEY environment variable in your .env file")
+        print(f"Error: API key for {provider_name} not found in environment variables or config")
+        print(f"Please set the {provider_name.upper().replace('-', '_')}_API_KEY environment variable in your .env file")
         return
     
     # Set the API key in the config
-    config.llm_config.api_key = api_key
+    setattr(config.llm_config, api_key_attr, api_key)
     
     try:
-        # Test with model_1 (default)
-        print("\n--- Testing with model_1 (default) ---")
+        # Get the LLM
+        start_time = time.time()
+        print("\nInitializing LLM...")
+        llm = get_llm(config, model_key=model_key, provider_key=provider_key)
+        init_time = time.time() - start_time
+        print(f"LLM initialized in {init_time:.2f} seconds")
         
-        # Use the get_llm function which now properly handles Google authentication
-        llm = get_llm(config)
-        
-        # Test with a simple prompt
-        prompt = "What is SPARQL and how is it used?"
+        # Test with the prompt
         print(f"\nPrompt: {prompt}")
+        start_time = time.time()
         response = llm.invoke(prompt)
-        print(response)
+        inference_time = time.time() - start_time
         
+        print(f"\nResponse (generated in {inference_time:.2f} seconds):")
+        print(response.content)
+        
+        return True
     except Exception as e:
-        print(f"\nError occurred while testing Google Generative AI: {str(e)}")
-        raise  # Re-raise the exception to see the full traceback
+        print(f"\nError occurred while testing {provider_name}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+def run_all_tests():
+    """Run tests for all available providers"""
+    
+    config = Configuration()
+    
+    # Get all provider keys
+    provider_keys = [
+        key for key in dir(config.llm_config) 
+        if key.startswith("provider_") and not key.startswith("__")
+    ]
+    
+    results = {}
+    
+    for provider_key in provider_keys:
+        provider_name = getattr(config.llm_config, provider_key)
+        result = test_provider(provider_key)
+        results[provider_name] = result
+    
+    # Print summary
+    print("\n" + "="*50)
+    print("Test Results Summary")
+    print("="*50)
+    for provider, success in results.items():
+        status = "✅ PASSED" if success else "❌ FAILED"
+        print(f"{provider}: {status}")
 
 if __name__ == "__main__":
-    test_google_llm()
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Test LLM providers and models")
+    parser.add_argument("--provider", type=str, help="Provider key (e.g., provider_1)")
+    parser.add_argument("--model", type=str, help="Model key (e.g., model_1)")
+    parser.add_argument("--prompt", type=str, help="Custom prompt to test with")
+    parser.add_argument("--all", action="store_true", help="Test all available providers")
+    
+    args = parser.parse_args()
+    
+    if args.all:
+        run_all_tests()
+    elif args.provider:
+        test_provider(args.provider, args.model, args.prompt)
+    else:
+        # Default: test the default provider
+        config = Configuration()
+        default_provider_key = config.llm_config.default_provider
+        test_provider(default_provider_key)

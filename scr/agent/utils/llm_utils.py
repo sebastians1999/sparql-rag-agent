@@ -44,14 +44,14 @@ except ImportError:
 from scr.agent.utils.config import Configuration, LLMConfig
 
 
-def get_llm(config: Optional[Configuration] = None, model_key: Optional[str] = None) -> BaseChatModel:
+def get_llm(config: Optional[Configuration] = None, model_key: Optional[str] = None, provider_key: Optional[str] = None) -> BaseChatModel:
     """
     Get an LLM instance based on the configuration.
     
     Args:
         config: The configuration object. If None, a default config will be created.
-        model_key: The key of the model to use. If None, model_1 will be used.
-                  Valid values are 'model_1', 'model_2', or any other model attribute defined in LLMConfig.
+        model_key: The model name to use. If None, model_1 will be used.
+        provider_key: The provider key to use. If None, the default provider will be used.
         
     Returns:
         An instance of a language model that implements the BaseChatModel interface.
@@ -64,24 +64,24 @@ def get_llm(config: Optional[Configuration] = None, model_key: Optional[str] = N
     
     llm_config = config.llm_config
     
-    # Determine which model to use
-    if model_key is not None:
-        if hasattr(llm_config, model_key):
-            model_name = getattr(llm_config, model_key)
-        else:
-            raise ValueError(f"Model key '{model_key}' not found in LLMConfig")
+    if provider_key is not None:
+        provider_name = getattr(llm_config, provider_key)
     else:
-        # Default to model_1 if no model_key is specified
-        model_name = llm_config.model_1
+        print("Error, no provider key specified or key not found in config")
+        return None
     
-    # Common parameters for all LLMs
+    if model_key is not None:
+        model_name = getattr(llm_config, model_key)
+    else:
+        print("Error, no model key specified or key not found in config")
+        return None
+    
     common_params = {
         "temperature": llm_config.temperature,
         "max_tokens": llm_config.max_tokens,
     }
     
-    # Provider-specific instantiation
-    if llm_config.provider.lower() == "together":
+    if provider_name.lower() == "together":
         if not TOGETHER_AVAILABLE:
             raise ImportError(
                 "The 'langchain_together' package is not installed. "
@@ -89,10 +89,11 @@ def get_llm(config: Optional[Configuration] = None, model_key: Optional[str] = N
             )
         return Together(
             model=model_name,
+            api_key=llm_config.together_api_key,
             **common_params
         )
     
-    elif llm_config.provider.lower() == "openai":
+    elif provider_name.lower() == "openai":
         if not OPENAI_AVAILABLE:
             raise ImportError(
                 "The 'langchain_openai' package is not installed. "
@@ -100,11 +101,11 @@ def get_llm(config: Optional[Configuration] = None, model_key: Optional[str] = N
             )
         return ChatOpenAI(
             model=model_name,
-            api_key=llm_config.api_key,
+            api_key=llm_config.openai_api_key,
             **common_params
         )
     
-    elif llm_config.provider.lower() == "anthropic":
+    elif provider_name.lower() == "anthropic":
         if not ANTHROPIC_AVAILABLE:
             raise ImportError(
                 "The 'langchain_anthropic' package is not installed. "
@@ -112,10 +113,10 @@ def get_llm(config: Optional[Configuration] = None, model_key: Optional[str] = N
             )
         return ChatAnthropic(
             model=model_name,
-            api_key=llm_config.api_key,
+            api_key=llm_config.anthropic_api_key,
             **common_params
         )
-    elif llm_config.provider.lower() == "groq":
+    elif provider_name.lower() == "groq":
         if not GROQ_AVAILABLE:
             raise ImportError(
                 "The 'langchain_groq' package is not installed. "
@@ -123,22 +124,20 @@ def get_llm(config: Optional[Configuration] = None, model_key: Optional[str] = N
             )
         return ChatGroq(
             model=model_name,
-            api_key=llm_config.api_key,
+            api_key=llm_config.groq_api_key,
             **common_params
         )
-    elif llm_config.provider.lower() == "google-genai":
+    elif provider_name.lower() == "google-genai":
         if not GOOGLE_GENAI_AVAILABLE:
             raise ImportError(
                 "The 'langchain_google_genai' package is not installed. "
                 "Please install it with 'pip install langchain_google_genai'."
             )
-        
-        
         return ChatGoogleGenerativeAI(
             model=model_name,
-            api_key=llm_config.api_key,
+            api_key=llm_config.google_genai_api_key,
             **common_params
         )
     
     else:
-        raise ValueError(f"Unsupported LLM provider: {llm_config.provider}")
+        raise ValueError(f"Unsupported LLM provider: {provider_name}")

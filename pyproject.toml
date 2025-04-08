@@ -30,6 +30,7 @@ dependencies = [
     "datasets>=3.5.0",
     "langchain-together>=0.3.0",
     "langchain-google-genai>=2.1.2",
+    "ipykernel>=6.29.5",
 ]
 
 [build-system]

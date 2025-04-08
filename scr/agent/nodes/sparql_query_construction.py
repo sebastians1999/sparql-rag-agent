@@ -27,31 +27,34 @@ async def query_generator(state: State, config: RunnableConfig) -> Dict[str, Lis
         configuration = Configuration.from_runnable_config(config)
 
 
-        llm = get_llm(configuration)
+        llm = get_llm(configuration, provider_key="provider_1", model_key="together_model_2")
 
         prompt_template = ChatPromptTemplate.from_messages(
             [
                 ("system", QUERY_GENERATION_PROMPT),
-                ("user", "{question} {potential_entities}"),
-                #add retrieved documents later("user", "{retrieved_documents}"),
+                ("placeholder", "{question} {potential_entities} {retrieved_documents}"),
             ]
         )
 
-        formatted_messages = prompt_template.format_messages(
-            question=state.messages[0].content if state.messages else "Generate a SPARQL query",
-            potential_entities=state.extracted_entities if hasattr(state, 'extracted_entities') else ""
+        message = await prompt_template.ainvoke(
+            {
+                "question": state.structured_question.question_steps[0] if state.structured_question.question_steps else "Generate a SPARQL query",
+                "potential_entities": state.extracted_entities,
+                "retrieved_documents": [doc.page_content for doc in state.retrieved_docs],
+            }
         )
         
-        response_message = await llm.ainvoke(formatted_messages)
+        response_message = await llm.ainvoke(message)
 
-        extracted_queries = extract_sparql_queries(response_message.content)
+        extracted_queries = extract_sparql_queries(response_message)
+    
 
         return {
-            "structured_output": extracted_queries[0] if extracted_queries else "",
+            "structured_output": extracted_queries[-1] if extracted_queries else "",
             "steps": [
                 StepOutput(
                     label="Generated SPARQL query",
-                    details=response_message.content,
+                    details=response_message,
                 )
             ]
         }

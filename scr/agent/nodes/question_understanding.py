@@ -31,7 +31,7 @@ async def question_understanding(state: State, config: RunnableConfig) -> Dict[s
 
     try:
         configuration = Configuration.from_runnable_config(config)
-        llm = get_llm(configuration).with_structured_output(schema = StructuredQuestion)
+        llm = get_llm(configuration, provider_key="provider_4", model_key="groq_model_1").with_structured_output(schema = StructuredQuestion)
         
         prompt_template = ChatPromptTemplate.from_messages(
             [
@@ -43,7 +43,7 @@ async def question_understanding(state: State, config: RunnableConfig) -> Dict[s
         message_value = await prompt_template.ainvoke(
             {
                 "messages": state.messages,
-            },
+            }
         )
 
         structured_question: StructuredQuestion = await llm.ainvoke(message_value)
